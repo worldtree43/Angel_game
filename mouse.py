@@ -45,6 +45,20 @@ class Mouse(object):
         self.last_action = None
         self.furthest_y = 0
         self.furthest_x = 0
+    
+    def check_surroundings(self, board, position):
+        safe_directions = []
+        x, y = position
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx == 0 and dy == 0:
+                    continue # skip current position
+                new_x, new_y = x + dx, y + dy
+                if 0 <= new_x < len(board) and 0 <= new_y < len(board[0]):
+                    if board[new_x][new_y] != 1:  # board[new_x, new_y] != 1
+                        safe_directions.append((dx, dy))
+
+        return safe_directions
 
     def update(self, board, position):
         reward = -1
@@ -88,12 +102,23 @@ class Mouse(object):
         if game_end == "Win" or game_end == "Lose":
             return game_end
 
-        action = self.ai.choose_action(state)
+        safe_directions = self.check_surroundings(board, position)
+
+        # modify Q-value to avoid obstacles
+        modified_q_values = {a: (self.ai.get_q(state, a) if a in safe_directions else -float('inf')) for a in
+                             self.actions}
+        max_q_value = max(modified_q_values.values())
+        best_actions = [action for action, q_value in modified_q_values.items() if q_value == max_q_value]
+
+        if best_actions:
+            action = random.choice(best_actions)
+        else:
+            action = random.choice(self.actions)
 
         self.last_state = state
         self.last_action = action
 
-        return self.last_action
+        return action
 
     def output_table(self, plays):
         with open(f"qtables/mouse_q.txt", "w+") as f:
